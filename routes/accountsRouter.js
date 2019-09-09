@@ -15,7 +15,7 @@ router.get("/", (req, res) => {
     });
 });
 
-router.get("/:id", (req, res) => {
+router.get("/:id", validateAccountID, (req, res) => {
   const { id } = req.params;
   db("accounts")
     .where({ id })
@@ -34,7 +34,7 @@ router.get("/:id", (req, res) => {
     });
 });
 
-router.post("/", (req, res) => {
+router.post("/", validatePost, (req, res) => {
   const newPost = req.body;
   db("accounts")
     .insert(newPost, "id")
@@ -54,13 +54,19 @@ router.post("/", (req, res) => {
     });
 });
 
-router.put("/:id", (req, res) => {
+router.put("/:id", validateAccountID, (req, res) => {
   const updatedInfo = req.body;
   db("accounts")
     .where({ id: req.params.id })
     .update(updatedInfo)
     .then(count => {
-      res.status(200).json({ message: `updated ${count} account(s)` });
+      if (!count) {
+        res.status(400).json({
+          error: `Server could not find account with the id:${id} to update`
+        });
+      } else {
+        res.status(200).json({ message: `updated ${count} account(s)` });
+      }
     })
     .catch(err => {
       res.status(500).json({ error: "Server Could Not Update Account" });
@@ -87,5 +93,39 @@ router.delete("/:id", (req, res) => {
       res.status(500).json({ error: "Account could not be deleted" });
     });
 });
+
+function validatePost(req, res, next) {
+  const name = req.body.name;
+  const budget = req.body.budget;
+  if (!name) {
+    res
+      .status(404)
+      .json({ error: "You can not post an account without a name field" });
+  } else if (!budget) {
+    res
+      .status(404)
+      .json({ error: "You can not post an account without a budget" });
+  } else {
+    next();
+  }
+}
+
+function validateAccountID(req, res, next) {
+  const id = req.params.id;
+  db("accounts")
+    .where({ id: id })
+    .first()
+    .then(account => {
+      if (!account) {
+        res.status(404).json({ error: "Account with that ID does not exist" });
+      } else {
+        req.account = account;
+        res.status(200).json(account);
+      }
+    })
+    .catch(err => {
+      res.status(500).json({ err: "Sever could not validate ID" });
+    });
+}
 
 module.exports = router;
